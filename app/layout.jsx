@@ -1,12 +1,9 @@
 import '../styles/globals.css';
-import { Footer } from '../components/footer';
-import { Header } from '../components/header';
+import Script from 'next/script';
 
 export const metadata = {
-    title: {
-        template: '%s | Netlify',
-        default: 'Netlify Starter'
-    }
+    title: 'HyperScale SEO — AI-Driven SEO at Scale',
+    description: 'Scale your organic traffic with AI-driven SEO. Get started with the AI SEO Kickstart package.',
 };
 
 export default function RootLayout({ children }) {
@@ -14,15 +11,13 @@ export default function RootLayout({ children }) {
         <html lang="en">
             <head>
                 <link rel="icon" href="/favicon.svg" sizes="any" />
+                <Script
+                    src="https://www.paypal.com/sdk/js?client-id=BAA-8dx4tWet-ihYkm-IDEnAdtpL1Gqe074mEijnhGpifZnN_k_hd37mJfJUqB5r5MxeXZRl7mSOZlmw_E&components=hosted-buttons&enable-funding=venmo&currency=USD"
+                    strategy="afterInteractive"
+                />
             </head>
-            <body className="antialiased text-white bg-blue-900">
-                <div className="flex flex-col min-h-screen px-6 bg-noise sm:px-12">
-                    <div className="flex flex-col w-full max-w-5xl mx-auto grow">
-                        <Header />
-                        <main className="grow">{children}</main>
-                        <Footer />
-                    </div>
-                </div>
+            <body className="antialiased">
+                {children}
             </body>
         </html>
     );
