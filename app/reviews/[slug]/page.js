@@ -1,12 +1,7 @@
-import { notFound } from 'next/navigation';
-
-async function getAirtableData(slug) {
+async function getAirtableData() {
   const baseId = process.env.AIRTABLE_BASE_ID;
   const table = 'SEO Tools'; 
   const apiKey = process.env.AIRTABLE_API_KEY;
-
-  // We removed the finicky Airtable "filter" entirely. 
-  // Now we just grab the table and let the website do the work!
   const url = `https://api.airtable.com/v0/${baseId}/${table}`;
 
   try {
@@ -14,30 +9,40 @@ async function getAirtableData(slug) {
       headers: { Authorization: `Bearer ${apiKey}` },
       next: { revalidate: 10 }, 
     });
-
-    if (!res.ok) return null;
-
+    if (!res.ok) return { error: 'API Error' };
     const data = await res.json();
-    
-    // The website looks through the list and finds the matching tool
-    if (data.records) {
-      return data.records.find(record => {
-         // This line checks every possible way your column might be named
-         const name = record.fields.toolName || record.fields['Tool Name'] || record.fields['A toolName'] || '';
-         return name.toLowerCase() === slug.toLowerCase();
-      });
-    }
-    return null;
+    return { records: data.records };
   } catch (error) {
-    return null;
+    return { error: 'Network Error' };
   }
 }
 
 export default async function ReviewPage({ params }) {
   const { slug } = params;
-  const record = await getAirtableData(slug);
+  const data = await getAirtableData();
 
-  if (!record) return notFound();
+  if (data.error || !data.records) {
+    return <div className="p-10 text-red-600 font-bold">Error connecting to Airtable.</div>;
+  }
+
+  // Find the record and use .trim() to destroy hidden spaces!
+  const record = data.records.find(r => {
+     const name = r.fields.toolName || r.fields['Tool Name'] || r.fields['A toolName'] || '';
+     return name.trim().toLowerCase() === slug.trim().toLowerCase();
+  });
+
+  // THE DETECTIVE MODE: Instead of a 404, tell us what went wrong!
+  if (!record) {
+     const availableNames = data.records.map(r => r.fields.toolName || r.fields['Tool Name'] || r.fields['A toolName'] || 'EmptyRow').join(', ');
+     return (
+       <div className="p-10 font-sans max-w-2xl mx-auto mt-10 bg-red-50 border border-red-200 rounded-lg">
+         <h1 className="text-2xl font-bold text-red-700 mb-4">Detective Mode: Tool Not Found</h1>
+         <p className="text-lg mb-2">The website tried to load the URL for: <strong className="bg-yellow-200 px-1">"{slug}"</strong></p>
+         <p className="text-lg mb-4">But Airtable only sent over these tools: <strong className="bg-white px-1 border">{availableNames}</strong></p>
+         <p className="text-sm text-gray-600">If you see Serpstat in the list above, there is a spelling mismatch. If the list is blank, Airtable is empty!</p>
+       </div>
+     );
+  }
 
   const { fields } = record;
   const actualName = fields.toolName || fields['Tool Name'] || fields['A toolName'] || slug;
