@@ -1,3 +1,5 @@
+import { notFound } from 'next/navigation';
+
 async function getAirtableData() {
   const baseId = process.env.AIRTABLE_BASE_ID;
   const table = 'SEO Tools'; 
@@ -11,41 +13,51 @@ async function getAirtableData() {
     });
     if (!res.ok) return { error: 'API Error' };
     const data = await res.json();
-    return { records: data.records };
+    return { records: data.records || [] };
   } catch (error) {
     return { error: 'Network Error' };
   }
 }
 
 export default async function ReviewPage({ params }) {
-  const { slug } = params;
+  // FIX: Safely handles the URL parameter so the server never crashes
+  const resolvedParams = await params;
+  const rawSlug = resolvedParams?.slug || '';
+  const safeSlug = String(rawSlug).trim().toLowerCase();
+
   const data = await getAirtableData();
 
-  if (data.error || !data.records) {
-    return <div className="p-10 text-red-600 font-bold">Error connecting to Airtable.</div>;
+  if (data.error || !data.records || data.records.length === 0) {
+    return (
+      <div className="p-10 font-sans max-w-2xl mx-auto mt-10 bg-red-50 border border-red-300 rounded-lg text-red-800">
+        <h1 className="text-2xl font-bold mb-2">Airtable Connection Error</h1>
+        <p>Could not load data from Airtable. Please check your API Key and Base ID.</p>
+      </div>
+    );
   }
 
-  // Find the record and use .trim() to destroy hidden spaces!
+  // Safe search that won't crash if a field is empty
   const record = data.records.find(r => {
-     const name = r.fields.toolName || r.fields['Tool Name'] || r.fields['A toolName'] || '';
-     return name.trim().toLowerCase() === slug.trim().toLowerCase();
+     const nameField = r.fields.toolName || r.fields['Tool Name'] || r.fields['A toolName'] || '';
+     const safeName = String(nameField).trim().toLowerCase();
+     return safeName === safeSlug;
   });
 
-  // THE DETECTIVE MODE: Instead of a 404, tell us what went wrong!
+  // THE DETECTIVE MODE UI
   if (!record) {
      const availableNames = data.records.map(r => r.fields.toolName || r.fields['Tool Name'] || r.fields['A toolName'] || 'EmptyRow').join(', ');
      return (
-       <div className="p-10 font-sans max-w-2xl mx-auto mt-10 bg-red-50 border border-red-200 rounded-lg">
-         <h1 className="text-2xl font-bold text-red-700 mb-4">Detective Mode: Tool Not Found</h1>
-         <p className="text-lg mb-2">The website tried to load the URL for: <strong className="bg-yellow-200 px-1">"{slug}"</strong></p>
-         <p className="text-lg mb-4">But Airtable only sent over these tools: <strong className="bg-white px-1 border">{availableNames}</strong></p>
-         <p className="text-sm text-gray-600">If you see Serpstat in the list above, there is a spelling mismatch. If the list is blank, Airtable is empty!</p>
+       <div className="p-10 font-sans max-w-3xl mx-auto mt-10 bg-yellow-50 border border-yellow-300 rounded-lg text-slate-800">
+         <h1 className="text-2xl font-bold text-yellow-700 mb-4">Detective Mode: Tool Not Found</h1>
+         <p className="text-lg mb-2">The website searched for: <strong className="bg-white px-2 py-1 border rounded text-red-600">"{rawSlug}"</strong></p>
+         <p className="text-lg mb-4">But Airtable provided these tools: <strong className="bg-white px-2 py-1 border rounded block mt-2 leading-relaxed">{availableNames}</strong></p>
+         <p className="text-sm text-gray-500 mt-4">If you see your tool in the list above, there is a typo between the URL and Airtable.</p>
        </div>
      );
   }
 
   const { fields } = record;
-  const actualName = fields.toolName || fields['Tool Name'] || fields['A toolName'] || slug;
+  const actualName = fields.toolName || fields['Tool Name'] || fields['A toolName'] || rawSlug;
 
   return (
     <main className="max-w-4xl mx-auto p-8 font-sans">
