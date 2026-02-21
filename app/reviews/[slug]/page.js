@@ -2,28 +2,33 @@ import { notFound } from 'next/navigation';
 
 async function getAirtableData(slug) {
   const baseId = process.env.AIRTABLE_BASE_ID;
-  const tableIdOrName = 'SEO Tools'; 
+  const table = 'SEO Tools'; 
   const apiKey = process.env.AIRTABLE_API_KEY;
 
-  // FIX: Using 'toolName' to match your Airtable column exactly
-  const filter = encodeURIComponent(`{toolName}='${slug}'`);
-  const url = `https://api.airtable.com/v0/${baseId}/${tableIdOrName}?filterByFormula=${filter}`;
+  // We removed the finicky Airtable "filter" entirely. 
+  // Now we just grab the table and let the website do the work!
+  const url = `https://api.airtable.com/v0/${baseId}/${table}`;
 
   try {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${apiKey}` },
-      next: { revalidate: 60 }, 
+      next: { revalidate: 10 }, 
     });
 
-    if (!res.ok) {
-      console.error('Airtable API Error:', await res.text());
-      return null;
-    }
+    if (!res.ok) return null;
 
     const data = await res.json();
-    return data.records && data.records.length > 0 ? data.records[0] : null;
+    
+    // The website looks through the list and finds the matching tool
+    if (data.records) {
+      return data.records.find(record => {
+         // This line checks every possible way your column might be named
+         const name = record.fields.toolName || record.fields['Tool Name'] || record.fields['A toolName'] || '';
+         return name.toLowerCase() === slug.toLowerCase();
+      });
+    }
+    return null;
   } catch (error) {
-    console.error('Fetch Error:', error);
     return null;
   }
 }
@@ -35,6 +40,7 @@ export default async function ReviewPage({ params }) {
   if (!record) return notFound();
 
   const { fields } = record;
+  const actualName = fields.toolName || fields['Tool Name'] || fields['A toolName'] || slug;
 
   return (
     <main className="max-w-4xl mx-auto p-8 font-sans">
@@ -44,8 +50,7 @@ export default async function ReviewPage({ params }) {
         </span>
       </div>
       
-      {/* FIX: toolName match */}
-      <h1 className="text-5xl font-extrabold mb-6 text-slate-900">{fields['toolName']}</h1>
+      <h1 className="text-5xl font-extrabold mb-6 text-slate-900">{actualName}</h1>
       
       <div className="prose lg:prose-xl text-slate-700">
         <p className="text-2xl leading-relaxed mb-8 border-l-4 border-blue-500 pl-4 italic">
@@ -55,8 +60,7 @@ export default async function ReviewPage({ params }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
             <h3 className="font-bold text-slate-500 uppercase text-xs tracking-wider mb-1">Pricing</h3>
-            {/* FIX: Handles both 'price' and 'Price' capitalization */}
-            <p className="text-lg font-semibold">{fields['price'] || fields['Price'] || 'Contact for Pricing'}</p>
+            <p className="text-lg font-semibold">{fields['price'] || fields['Price'] || fields['Pricing'] || 'Contact for Pricing'}</p>
           </div>
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
             <h3 className="font-bold text-slate-500 uppercase text-xs tracking-wider mb-1">Best For</h3>
