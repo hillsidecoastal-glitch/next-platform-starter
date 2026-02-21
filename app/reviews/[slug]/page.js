@@ -5,8 +5,8 @@ async function getAirtableData(slug) {
   const tableIdOrName = 'SEO Tools'; 
   const apiKey = process.env.AIRTABLE_API_KEY;
 
-  // This line is the "Magic Fix" - it properly encodes the search formula
-  const filter = encodeURIComponent(`{Tool Name}='${slug}'`);
+  // FIX: Using 'toolName' to match your Airtable column exactly
+  const filter = encodeURIComponent(`{toolName}='${slug}'`);
   const url = `https://api.airtable.com/v0/${baseId}/${tableIdOrName}?filterByFormula=${filter}`;
 
   try {
@@ -16,7 +16,7 @@ async function getAirtableData(slug) {
     });
 
     if (!res.ok) {
-      console.error('Airtable Error:', await res.text());
+      console.error('Airtable API Error:', await res.text());
       return null;
     }
 
@@ -43,14 +43,30 @@ export default async function ReviewPage({ params }) {
           {fields['Category (Select)'] || 'SEO Tool'}
         </span>
       </div>
-      <h1 className="text-5xl font-extrabold mb-6 text-slate-900">{fields['Tool Name']}</h1>
+      
+      {/* FIX: toolName match */}
+      <h1 className="text-5xl font-extrabold mb-6 text-slate-900">{fields['toolName']}</h1>
+      
       <div className="prose lg:prose-xl text-slate-700">
         <p className="text-2xl leading-relaxed mb-8 border-l-4 border-blue-500 pl-4 italic">
           {fields['Review Summary']}
         </p>
-        <div className="bg-slate-50 border border-slate-200 p-8 rounded-2xl mb-10">
-          <h2 className="text-2xl font-bold mb-4 text-slate-800">Expert Verdict</h2>
-          <p className="text-lg">{fields['SEO Review']}</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <h3 className="font-bold text-slate-500 uppercase text-xs tracking-wider mb-1">Pricing</h3>
+            {/* FIX: Handles both 'price' and 'Price' capitalization */}
+            <p className="text-lg font-semibold">{fields['price'] || fields['Price'] || 'Contact for Pricing'}</p>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <h3 className="font-bold text-slate-500 uppercase text-xs tracking-wider mb-1">Best For</h3>
+            <p className="text-lg font-semibold">{fields['Best For'] || 'SEO Professionals'}</p>
+          </div>
+        </div>
+
+        <div className="bg-slate-900 text-white p-8 rounded-2xl mb-10 shadow-xl">
+          <h2 className="text-2xl font-bold mb-4 text-blue-400">Expert Verdict</h2>
+          <p className="text-lg leading-relaxed">{fields['SEO Review']}</p>
         </div>
       </div>
     </main>
