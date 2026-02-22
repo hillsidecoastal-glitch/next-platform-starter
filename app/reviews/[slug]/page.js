@@ -19,32 +19,36 @@ async function getAirtableData() {
   }
 }
 
-// THE FIX: This unpacks Airtable's AI-generated text fields perfectly
+// Unpacks Airtable's AI-generated text fields
 function extractText(field) {
   if (!field) return '';
-  
-  // If it's a string, it might be a stringified JSON object from Airtable AI
   if (typeof field === 'string') {
     try {
       const parsed = JSON.parse(field);
       if (parsed && parsed.value) return parsed.value;
     } catch (e) {
-      // Not JSON, just a regular string
       return field;
     }
     return field;
   }
-  
-  // If it's a list (like a multi-select or lookup), join it with commas
   if (Array.isArray(field)) return field.join(', ');
-  
-  // If it's a raw Airtable object (like an AI field), grab the 'value'
   if (typeof field === 'object') {
     if (field.value) return field.value;
     return JSON.stringify(field); 
   }
-  
   return String(field);
+}
+
+// THE FIX: This turns raw AI symbols into beautiful HTML formatting!
+function formatMarkdown(text) {
+  if (!text) return "";
+  return text
+    .replace(/^### (.*$)/gim, '<h3 class="text-xl font-bold mt-6 mb-2 text-slate-800">$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2 class="text-2xl font-bold mt-8 mb-3 text-slate-900">$1</h2>')
+    .replace(/^\- (.*$)/gim, '<li class="ml-6 list-disc mb-1">$1</li>')
+    .replace(/\*\*(.*?)\*\*/gim, '<strong class="font-bold text-slate-900">$1</strong>')
+    .replace(/\*(.*?)\*/gim, '<strong class="font-semibold text-slate-800">$1</strong>')
+    .replace(/\n/gim, '<br />');
 }
 
 export default async function ReviewPage({ params }) {
@@ -63,14 +67,7 @@ export default async function ReviewPage({ params }) {
      return String(nameField).trim().toLowerCase() === safeSlug;
   });
 
-  if (!record) {
-     return (
-       <div className="p-10 max-w-3xl mx-auto mt-10 bg-yellow-50 border border-yellow-300 rounded-lg text-slate-800">
-         <h1 className="text-2xl font-bold text-yellow-700 mb-4">Tool Not Found</h1>
-         <p className="text-lg">Searched for: <strong>"{rawSlug}"</strong></p>
-       </div>
-     );
-  }
+  if (!record) return notFound();
 
   const { fields } = record;
   
@@ -84,36 +81,48 @@ export default async function ReviewPage({ params }) {
   return (
     <main className="max-w-4xl mx-auto p-8 font-sans">
       <div className="mb-6">
-        <span className="bg-blue-100 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded">
+        <span className="bg-blue-100 text-blue-800 text-sm font-semibold px-2.5 py-0.5 rounded shadow-sm">
           {category}
         </span>
       </div>
       
-      <h1 className="text-5xl font-extrabold mb-6 text-slate-900">{actualName}</h1>
+      <h1 className="text-5xl font-extrabold mb-6 text-slate-900 tracking-tight">{actualName}</h1>
       
       <div className="prose lg:prose-xl text-slate-700">
         
+        {/* We moved the massive Review Summary down here where the Expert Verdict was! */}
         {summary && (
-          <p className="text-2xl leading-relaxed mb-8 border-l-4 border-blue-500 pl-4 italic whitespace-pre-wrap">
-            {summary}
-          </p>
+          <div className="bg-white border border-slate-200 p-8 rounded-2xl mb-10 shadow-sm">
+            <h2 className="text-2xl font-bold mb-4 text-slate-800">Our Evaluation</h2>
+            {/* This special tag allows our Markdown Formatter to inject the bolding and lists safely */}
+            <div 
+              className="text-lg leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: formatMarkdown(summary) }} 
+            />
+          </div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-            <h3 className="font-bold text-slate-500 uppercase text-xs tracking-wider mb-1">Pricing</h3>
-            <p className="text-lg font-semibold">{price}</p>
+          <div className="p-6 bg-slate-50 rounded-xl border border-slate-200 shadow-sm">
+            <h3 className="font-bold text-slate-500 uppercase text-xs tracking-wider mb-2">Pricing</h3>
+            <p className="text-xl font-semibold text-slate-800">{price}</p>
           </div>
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-            <h3 className="font-bold text-slate-500 uppercase text-xs tracking-wider mb-1">Best For</h3>
-            <p className="text-lg font-semibold">{bestFor}</p>
+          <div className="p-6 bg-slate-50 rounded-xl border border-slate-200 shadow-sm">
+            <h3 className="font-bold text-slate-500 uppercase text-xs tracking-wider mb-2">Best For</h3>
+            <p className="text-xl font-semibold text-slate-800">{bestFor}</p>
           </div>
         </div>
 
-        <div className="bg-slate-900 text-white p-8 rounded-2xl mb-10 shadow-xl">
-          <h2 className="text-2xl font-bold mb-4 text-blue-400">Expert Verdict</h2>
-          <p className="text-lg leading-relaxed whitespace-pre-wrap">{seoReview || "Review coming soon!"}</p>
-        </div>
+        {/* This will show if you ever fill out the SEO Review column in Airtable */}
+        {seoReview && (
+          <div className="bg-slate-900 text-white p-8 rounded-2xl mb-10 shadow-xl">
+            <h2 className="text-2xl font-bold mb-4 text-blue-400">Expert Verdict</h2>
+            <div 
+              className="text-lg leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: formatMarkdown(seoReview) }} 
+            />
+          </div>
+        )}
       </div>
     </main>
   );
