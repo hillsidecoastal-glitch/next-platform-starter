@@ -19,12 +19,31 @@ async function getAirtableData() {
   }
 }
 
-// THE FIX: This translator forces Airtable Objects into readable text
+// THE FIX: This unpacks Airtable's AI-generated text fields perfectly
 function extractText(field) {
   if (!field) return '';
-  if (typeof field === 'string') return field;
-  if (Array.isArray(field)) return field.join(', '); // If it's a list, join it
-  if (typeof field === 'object') return JSON.stringify(field); // If it's a raw object, stringify it
+  
+  // If it's a string, it might be a stringified JSON object from Airtable AI
+  if (typeof field === 'string') {
+    try {
+      const parsed = JSON.parse(field);
+      if (parsed && parsed.value) return parsed.value;
+    } catch (e) {
+      // Not JSON, just a regular string
+      return field;
+    }
+    return field;
+  }
+  
+  // If it's a list (like a multi-select or lookup), join it with commas
+  if (Array.isArray(field)) return field.join(', ');
+  
+  // If it's a raw Airtable object (like an AI field), grab the 'value'
+  if (typeof field === 'object') {
+    if (field.value) return field.value;
+    return JSON.stringify(field); 
+  }
+  
   return String(field);
 }
 
@@ -55,7 +74,6 @@ export default async function ReviewPage({ params }) {
 
   const { fields } = record;
   
-  // Running all fields through the translator to prevent [object Object]
   const actualName = extractText(fields.toolName || fields['Tool Name'] || fields['A toolName'] || rawSlug);
   const category = extractText(fields['Category (Select)'] || 'SEO Tool');
   const summary = extractText(fields['Review Summary']);
@@ -75,9 +93,8 @@ export default async function ReviewPage({ params }) {
       
       <div className="prose lg:prose-xl text-slate-700">
         
-        {/* Only show the summary if there is one */}
         {summary && (
-          <p className="text-2xl leading-relaxed mb-8 border-l-4 border-blue-500 pl-4 italic">
+          <p className="text-2xl leading-relaxed mb-8 border-l-4 border-blue-500 pl-4 italic whitespace-pre-wrap">
             {summary}
           </p>
         )}
