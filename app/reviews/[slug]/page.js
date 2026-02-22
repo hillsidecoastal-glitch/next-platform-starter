@@ -19,9 +19,16 @@ async function getAirtableData() {
   }
 }
 
+// THE FIX: This translator forces Airtable Objects into readable text
+function extractText(field) {
+  if (!field) return '';
+  if (typeof field === 'string') return field;
+  if (Array.isArray(field)) return field.join(', '); // If it's a list, join it
+  if (typeof field === 'object') return JSON.stringify(field); // If it's a raw object, stringify it
+  return String(field);
+}
+
 export default async function ReviewPage({ params }) {
-  // THE MAGIC FIX: This forces the site to wait for and read the URL correctly, 
-  // no matter what your folder is named in GitHub.
   const resolvedParams = await params;
   const rawSlug = resolvedParams?.slug || Object.values(resolvedParams)[0] || '';
   const safeSlug = String(rawSlug).trim().toLowerCase();
@@ -34,29 +41,27 @@ export default async function ReviewPage({ params }) {
 
   const record = data.records.find(r => {
      const nameField = r.fields.toolName || r.fields['Tool Name'] || r.fields['A toolName'] || '';
-     const safeName = String(nameField).trim().toLowerCase();
-     return safeName === safeSlug;
+     return String(nameField).trim().toLowerCase() === safeSlug;
   });
 
   if (!record) {
-     const availableNames = data.records.map(r => String(r.fields.toolName || r.fields['Tool Name'] || r.fields['A toolName'] || 'EmptyRow')).join(', ');
      return (
        <div className="p-10 max-w-3xl mx-auto mt-10 bg-yellow-50 border border-yellow-300 rounded-lg text-slate-800">
-         <h1 className="text-2xl font-bold text-yellow-700 mb-4">Detective Mode: Tool Not Found</h1>
-         <p className="text-lg mb-2">Searched for: <strong>"{rawSlug}"</strong></p>
-         <p className="text-lg mb-4">Found these tools instead: <strong className="block mt-2">{availableNames}</strong></p>
+         <h1 className="text-2xl font-bold text-yellow-700 mb-4">Tool Not Found</h1>
+         <p className="text-lg">Searched for: <strong>"{rawSlug}"</strong></p>
        </div>
      );
   }
 
   const { fields } = record;
   
-  const actualName = String(fields.toolName || fields['Tool Name'] || fields['A toolName'] || rawSlug);
-  const category = String(fields['Category (Select)'] || 'SEO Tool');
-  const summary = String(fields['Review Summary'] || '');
-  const price = String(fields['price'] || fields['Price'] || fields['Pricing'] || 'Contact for Pricing');
-  const bestFor = String(fields['Best For'] || 'SEO Professionals');
-  const seoReview = String(fields['SEO Review'] || '');
+  // Running all fields through the translator to prevent [object Object]
+  const actualName = extractText(fields.toolName || fields['Tool Name'] || fields['A toolName'] || rawSlug);
+  const category = extractText(fields['Category (Select)'] || 'SEO Tool');
+  const summary = extractText(fields['Review Summary']);
+  const price = extractText(fields['price'] || fields['Price'] || fields['Pricing'] || 'Contact for Pricing');
+  const bestFor = extractText(fields['Best For'] || 'SEO Professionals');
+  const seoReview = extractText(fields['SEO Review']);
 
   return (
     <main className="max-w-4xl mx-auto p-8 font-sans">
@@ -69,9 +74,13 @@ export default async function ReviewPage({ params }) {
       <h1 className="text-5xl font-extrabold mb-6 text-slate-900">{actualName}</h1>
       
       <div className="prose lg:prose-xl text-slate-700">
-        <p className="text-2xl leading-relaxed mb-8 border-l-4 border-blue-500 pl-4 italic">
-          {summary}
-        </p>
+        
+        {/* Only show the summary if there is one */}
+        {summary && (
+          <p className="text-2xl leading-relaxed mb-8 border-l-4 border-blue-500 pl-4 italic">
+            {summary}
+          </p>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -86,7 +95,7 @@ export default async function ReviewPage({ params }) {
 
         <div className="bg-slate-900 text-white p-8 rounded-2xl mb-10 shadow-xl">
           <h2 className="text-2xl font-bold mb-4 text-blue-400">Expert Verdict</h2>
-          <p className="text-lg leading-relaxed">{seoReview}</p>
+          <p className="text-lg leading-relaxed whitespace-pre-wrap">{seoReview || "Review coming soon!"}</p>
         </div>
       </div>
     </main>
