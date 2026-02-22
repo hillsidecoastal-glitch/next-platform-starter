@@ -20,18 +20,16 @@ async function getAirtableData() {
 }
 
 export default async function ReviewPage({ params }) {
-  const slug = params.slug || '';
-  const safeSlug = String(slug).trim().toLowerCase();
+  // THE MAGIC FIX: This forces the site to wait for and read the URL correctly, 
+  // no matter what your folder is named in GitHub.
+  const resolvedParams = await params;
+  const rawSlug = resolvedParams?.slug || Object.values(resolvedParams)[0] || '';
+  const safeSlug = String(rawSlug).trim().toLowerCase();
 
   const data = await getAirtableData();
 
   if (data.error || !data.records || data.records.length === 0) {
-    return (
-      <div className="p-10 text-red-800">
-        <h1 className="text-2xl font-bold">Airtable Connection Error</h1>
-        <p>Could not load data. Please check your API Key.</p>
-      </div>
-    );
+    return <div className="p-10 text-red-800 font-bold">Airtable Connection Error</div>;
   }
 
   const record = data.records.find(r => {
@@ -45,7 +43,7 @@ export default async function ReviewPage({ params }) {
      return (
        <div className="p-10 max-w-3xl mx-auto mt-10 bg-yellow-50 border border-yellow-300 rounded-lg text-slate-800">
          <h1 className="text-2xl font-bold text-yellow-700 mb-4">Detective Mode: Tool Not Found</h1>
-         <p className="text-lg mb-2">Searched for: <strong>"{slug}"</strong></p>
+         <p className="text-lg mb-2">Searched for: <strong>"{rawSlug}"</strong></p>
          <p className="text-lg mb-4">Found these tools instead: <strong className="block mt-2">{availableNames}</strong></p>
        </div>
      );
@@ -53,8 +51,7 @@ export default async function ReviewPage({ params }) {
 
   const { fields } = record;
   
-  // THE FIX: "Safe Extractors" force everything to be plain text so the screen never crashes
-  const actualName = String(fields.toolName || fields['Tool Name'] || fields['A toolName'] || slug);
+  const actualName = String(fields.toolName || fields['Tool Name'] || fields['A toolName'] || rawSlug);
   const category = String(fields['Category (Select)'] || 'SEO Tool');
   const summary = String(fields['Review Summary'] || '');
   const price = String(fields['price'] || fields['Price'] || fields['Pricing'] || 'Contact for Pricing');
